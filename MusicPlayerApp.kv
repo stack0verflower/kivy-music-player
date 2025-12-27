@@ -1,0 +1,237 @@
+<MusicPlayerAppScreenManager>:
+    MainScreen:
+        name: 'main'
+    ListScreen:
+        name: 'list'
+
+<ListScreen>:
+    BoxLayout:
+        orientation: 'vertical'
+        padding: "10dp"
+        spacing: "10dp"
+
+        BoxLayout: # Header Row
+            size_hint_y: None
+            height: "50dp"
+            Button:
+                text: "[font=FA]\uf060[/font] BACK"
+                markup: True
+                on_release:
+                    root.manager.current = "main"
+                    root.manager.transition.direction = "right"
+            Label:
+                text: "MANAGE PLAYLIST"
+                bold: True
+            Button:
+                text: "[font=FA]\uf067[/font] ADD MORE"
+                markup: True
+                on_release: root.open_windows_explorer() # You can call the same explorer function
+
+        ScrollView:
+            BoxLayout:
+                id: list_container
+                orientation: 'vertical'
+                size_hint_y: None
+                height: self.minimum_height
+                # Python will populate this dynamically
+
+<MainScreen>:
+    BoxLayout:
+        orientation: "vertical"
+        padding: "20dp"
+        spacing: "10dp"
+
+        canvas.before:
+            # 1. Clear the area with a base color
+            Color:
+                rgba: root.grad_color_1
+            Rectangle:
+                pos: self.pos
+                size: self.size
+
+            # 2. Draw the Gradient Mesh
+            Color:
+                rgba: 1, 1, 1, 1 # Keep this white so it doesn't tint your grad colors
+            Mesh:
+                mode: 'triangle_fan'
+                # Note: Removed 'root.' prefix inside the vertices list for cleaner access
+                vertices: [self.x, self.y, 0, 0, *root.grad_color_1, self.right, self.y, 0, 0, *root.grad_color_1, self.right, self.top, 0, 0, *root.grad_color_2, self.x, self.top, 0, 0, *root.grad_color_2]
+                indices: [0, 1, 2, 3]
+
+        # Using FloatLayout allows us to "move" the button easily
+        FloatLayout:
+            Button:
+                id: main_action_btn
+
+                # Transformation: Text and Position change automatically based on playlist state
+                text: "[font=FA]\uf07c[/font]  IMPORT MUSIC" if not app.playlist else "[font=FA]\uf055[/font]  MANAGE PLAYLIST"
+                markup: True
+                font_name: "Roboto"
+                size_hint: (0.6, 0.1) if not app.playlist else (0.2, 0.06)
+                pos_hint: {'center_x': 0.5, 'center_y': 0.5} if not app.playlist else {'right': 0.98, 'top': 0.98}
+
+                on_release:
+                    if not app.playlist: root.open_windows_explorer()
+                    else: root.manager.current = "list"
+
+            # THE "CREATE PLAYLIST" BUTTON (Only visible when music exists)
+#            Button:
+#                text: "\uf0c7  SAVE PLAYLIST"
+#                font_name: "FA"
+#                size_hint: (0.3, 0.07)
+#                pos_hint: {'x': 0.02, 'top': 0.98}
+#                opacity: 1 if app.playlist else 0
+#                disabled: not app.playlist
+#                # on_release: root.open_save_popup()
+
+        # CENTER AREA (The Pulse)
+        AnchorLayout:
+            id: visual_area
+            size_hint_y: 2
+            anchor_x: 'center'
+            anchor_y: 'center'
+            Label:
+                id: center_icon
+                text: "\uf001"
+                font_name: "FA"
+                font_size: "100sp"
+                color: 1, 1, 1, 1  # Semi-transparent white glow
+                opacity: 0.5
+
+        # Song credentials
+        BoxLayout:
+            orientation: 'vertical'
+            size_hint_y: 0.5
+            Label:
+                id: song_title
+                text: "Song Title"
+                font_size: '24sp'
+                bold: True
+
+        # Our slider
+        BoxLayout:
+            orientation: 'horizontal'
+            size_hint_y: 0.2
+            Label:
+                id: current_time_label
+                text: "00:00"
+                size_hint_x: 0.2
+            Slider:
+                id: progress_slider
+                min: 0
+                max: 100
+                value: 0
+
+                # When dragged event occurs, we have this on_value function
+                # Pass the value of slider, this way, we can keep track of time, as slider value tells time
+
+                # This is when we first start to drag the slider
+                on_touch_down: if self.collide_point(*args[1].pos): root.is_dragging_progress_bar = True
+
+                # This is dragging action, here we will update slider label, current_time label
+                on_value: root.progress_bar_drag(self.value)
+
+                # When released, jumped to that value
+
+                on_touch_up: if self.collide_point(*args[1].pos): root.is_dragging_progress_bar = False; root.seek_music(self.value)
+
+            Label:
+                id: total_time_label
+                text: "00:00"
+                size_hint_x: 0.2
+
+        # Our Buttons
+        BoxLayout:
+            orientation: 'horizontal'
+            size_hint_y: 0.5
+            spacing: 10
+            Button:
+                id: prev_song
+                font_name: "FA"
+                text: "\uf049"
+                font_size: "36sp"
+                disabled: True
+                on_press: root.prev_song()
+            Button:
+                id: skip_backward
+                font_name: "FA"
+                text: "\uf04a"
+                font_size: "36sp"
+                on_press: root.skip_backward()
+                disabled: True
+            Button:
+                id: play_button
+                font_name: "FA"
+                text: "\uf04b"
+                font_size: "36sp"
+                on_press: root.play_music()
+                disabled: True
+            Button:
+                id: skip_forward
+                font_name: "FA"
+                text: "\uf04e"
+                font_size: "36sp"
+                on_press: root.skip_forward()
+                disabled: True
+            Button:
+                id: next_song
+                font_name: "FA"
+                text: "\uf050"
+                font_size: "36sp"
+                disabled: True
+                on_press: root.next_song()
+
+        # Volume Slider Section
+        BoxLayout:
+            orientation: 'horizontal'
+            size_hint_y: 0.5
+            padding: [10, 0]
+            spacing: 5
+
+            # LHS Container for Icon and Percentage
+            BoxLayout:
+                orientation: 'horizontal'
+                size_hint_x: None
+                width: "100dp"
+                spacing: 5
+
+                Label:
+                    id: volume_icon
+                    font_name: "FA"
+                    font_size: "20sp"
+                    size_hint_x: None
+                    width: "40dp"
+
+                    # 1. Icon Swap Logic (4 States)
+                    text:
+                        "\uf6a9" if root.volume == 0 else \
+                        ("\uf027" if root.volume <= 0.33 else \
+                        ("\uf027" if root.volume <= 0.66 else "\uf028"))
+
+                    # 2. Dynamic Brightness Logic
+                    # (Reduces opacity as volume drops, goes grey when muted)
+                    color:
+                        (0.5, 0.5, 0.5, 1) if root.volume == 0 else \
+                        (1, 1, 1, 0.4 + (root.volume * 0.6))
+
+                Label:
+                    id: volume_percentage
+                    text: str(int(root.volume * 100)) + "%"
+                    font_size: "14sp"
+                    size_hint_x: None
+                    width: "45dp"
+                    halign: 'left'
+                    # Percentage also fades slightly as it gets quieter
+                    color: (1, 1, 1, 0.6 + (root.volume * 0.4))
+
+            # The Slider
+            Slider:
+                id: volume_control
+                min: 0
+                max: 1
+                value: root.volume
+                # Center the slider vertically within the box
+                size_hint_y: None
+                height: "40dp"
+                pos_hint: {'center_y': 0.5}
+                on_value: root.update_volume(self.value)
